@@ -2,6 +2,11 @@
 
 import { type FormEvent, useState } from "react";
 
+type ResearchResponse = {
+  summary?: string;
+  error?: string;
+};
+
 const features = [
   {
     title: "Company research",
@@ -20,8 +25,9 @@ const features = [
 export default function Home() {
   const [company, setCompany] = useState("");
   const [message, setMessage] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
     const cleanedCompany = company.trim();
@@ -31,7 +37,31 @@ export default function Home() {
       return;
     }
 
-    setMessage(`"${cleanedCompany}" is ready for research.`);
+    setIsLoading(true);
+    setMessage("");
+
+    try {
+      const response = await fetch("/api/research", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ company: cleanedCompany }),
+      });
+
+      const data: ResearchResponse = await response.json();
+
+      if (!response.ok) {
+        setMessage(data.error || "Research request failed.");
+        return;
+      }
+
+      setMessage(data.summary || "Research completed successfully.");
+    } catch {
+      setMessage("Could not connect to the research server.");
+    } finally {
+      setIsLoading(false);
+    }
   }
 
   return (
@@ -72,14 +102,17 @@ export default function Home() {
 
           <button
             type="submit"
-            className="min-h-12 rounded-lg bg-cyan-400 px-6 font-semibold text-slate-950 hover:bg-cyan-300"
+            disabled={isLoading}
+            className="min-h-12 rounded-lg bg-cyan-400 px-6 font-semibold text-slate-950 hover:bg-cyan-300 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            Research company
+            {isLoading ? "Researching..." : "Research company"}
           </button>
         </form>
 
         <p className="mt-3 text-sm text-slate-500" aria-live="polite">
-          {message || "Enter a company to start a research request."}
+          {isLoading
+            ? "Your request is being sent to the research server."
+            : message || "Enter a company to start a research request."}
         </p>
       </section>
 

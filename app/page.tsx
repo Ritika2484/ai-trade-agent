@@ -1,11 +1,19 @@
 "use client";
 
 import { type FormEvent, useState } from "react";
+type CompanyProfile = {
+  canonicalName: string;
+  ticker: string | null;
+  website: string | null;
+};
 
 type ResearchResponse = {
   summary?: string;
   error?: string;
+  profile?: CompanyProfile;
 };
+
+
 
 const features = [
   {
@@ -26,8 +34,11 @@ export default function Home() {
   const [company, setCompany] = useState("");
   const [message, setMessage] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [researchResult, setResearchResult] =
+    useState<ResearchResponse | null>(null);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+
     event.preventDefault();
 
     const cleanedCompany = company.trim();
@@ -39,6 +50,7 @@ export default function Home() {
 
     setIsLoading(true);
     setMessage("");
+    setResearchResult(null);
 
     try {
       const response = await fetch("/api/research", {
@@ -56,6 +68,7 @@ export default function Home() {
         return;
       }
 
+      setResearchResult(data);
       setMessage(data.summary || "Research completed successfully.");
     } catch {
       setMessage("Could not connect to the research server.");
@@ -114,6 +127,36 @@ export default function Home() {
             ? "Your request is being sent to the research server."
             : message || "Enter a company to start a research request."}
         </p>
+        {researchResult?.profile && (
+          <section className="mx-auto mt-8 max-w-xl rounded-xl border border-cyan-400/30 bg-slate-900 p-6 text-left">
+            <p className="text-sm font-semibold uppercase tracking-wider text-cyan-400">
+              AI company identification
+            </p>
+
+            <dl className="mt-5 grid gap-4 sm:grid-cols-3">
+              <div>
+                <dt className="text-sm text-slate-400">Official name</dt>
+                <dd className="mt-1 font-semibold text-white">
+                  {researchResult.profile.canonicalName}
+                </dd>
+              </div>
+
+              <div>
+                <dt className="text-sm text-slate-400">Ticker</dt>
+                <dd className="mt-1 font-semibold text-white">
+                  {researchResult.profile.ticker || "Not publicly traded"}
+                </dd>
+              </div>
+
+              <div>
+                <dt className="text-sm text-slate-400">Website</dt>
+                <dd className="mt-1 break-words font-semibold text-white">
+                  {researchResult.profile.website || "Unknown"}
+                </dd>
+              </div>
+            </dl>
+          </section>
+        )}
       </section>
 
       <section className="mx-auto grid max-w-6xl gap-5 px-6 pb-20 md:grid-cols-3">

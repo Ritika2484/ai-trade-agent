@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { identifyCompany } from "../../../library/agent/nodes/identify";
+import { researchGraph } from "../../../library/agent/graph";
 
 const researchRequestSchema = z.object({
   company: z.string().trim().min(1, "Company name is required.").max(100),
@@ -27,22 +27,44 @@ export async function POST(request: Request) {
     );
   }
 
+  const company = parsedRequest.data.company;
+
   try {
-    const profile = await identifyCompany(parsedRequest.data.company);
+    const result = await researchGraph.invoke({
+      companyName: company,
+    });
+
+    if (!result.profile || !result.report) {
+      throw new Error("Research workflow returned an incomplete result.");
+    }
 
     return NextResponse.json({
-      company: parsedRequest.data.company,
-      profile,
+      company,
+      profile: result.profile,
+      report: result.report,
+      sources: result.sources ?? [],
       status: "complete",
-      summary: `${profile.canonicalName} identified successfully.${profile.ticker ? ` Ticker: ${profile.ticker}.` : ""
-        }`,
+      summary: `${result.profile.canonicalName} research completed.`,
       generatedAt: new Date().toISOString(),
     });
   } catch (error) {
-    console.error("Company identification failed:", error);
+    console.error("Company research failed:", error);
+
+    const errorMessage =
+      error instanceof Error ? error.message : "Unknown research error.";
+
+    if (errorMessage.includes("rate_limit_exceeded")) {
+      return NextResponse.json(
+        {
+          error:
+            "AI quota is temporarily exhausted. Please wait a few minutes and try again.",
+        },
+        { status: 429 },
+      );
+    }
 
     return NextResponse.json(
-      { error: " Sorry...,AI research could not run. Check your GROQ_API_KEY and server terminal." },
+      { error: "AI research could not run. Check the server terminal." },
       { status: 500 },
     );
   }

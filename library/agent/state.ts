@@ -1,28 +1,21 @@
-import {Annotation} from '@langchain/langgraph';
-import z from 'zod';//library for schema validation
+import { StateSchema } from "@langchain/langgraph";
+import { z } from "zod";
 
-export interface ICanonicalEntity{
-    name:string,
-    ticker?:string,
-    domain?:string
+export const companyProfileSchema = z.object({
+  canonicalName: z.string(),
+  ticker: z.string().nullable(),
+  website: z.string().nullable(),
+});
 
-}
-export interface ITavilyResult{//purana ....duckduckgo use kre for seraching
-    title:string;
-    url:string;
-    content:string;
-}
+export const researchSourceSchema = z.object({
+  title: z.string(),
+  url: z.string().url(),
+  snippet: z.string(),
+});
 
-//annotation root degines the structure of the data that will be passed between nodes in the graph
-export const AgentAnnotation = Annotation.Root({// .root help to make state 
-    companyName: Annotation<string>(),
-    cannocialEntity: Annotation<ICanonicalEntity>(),
-
-    newsResults:Annotation<string[]>({
-        reducer:(left,right)=>(right?left.concat(right):left),
-        default:()=>[]
-        //reducer is used to combine multiple values into a single value. In this case, it concatenates the arrays of news results from different nodes in the graph.
-        // remaining nodes of research..
-    })
-
-})
+export const ResearchState = new StateSchema({
+  companyName: z.string(),
+  profile: companyProfileSchema.optional(),
+  report: z.string().optional(),
+  sources: z.array(researchSourceSchema).optional(),
+});

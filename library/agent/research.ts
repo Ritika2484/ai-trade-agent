@@ -68,5 +68,9 @@ export async function researchCompany(
     })),
   ]);
 
-  return { report, sources };
+  const uniqueSources = Array.from(
+  new Map(sources.map((source) => [source.url, source])).values(),
+);
+
+return { report, sources: uniqueSources };
 }

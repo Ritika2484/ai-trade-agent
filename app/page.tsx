@@ -1,6 +1,8 @@
 "use client";
 
 import { type FormEvent, useState } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 type CompanyProfile = {
   canonicalName: string;
   ticker: string | null;
@@ -141,26 +143,26 @@ export default function Home() {
             : message || "Enter a company to start a research request."}
         </p>
         {isLoading && (
-  <section className="mx-auto mt-8 max-w-xl rounded-xl border border-cyan-400/30 bg-slate-900 p-6 text-left">
-    <p className="text-sm font-semibold uppercase tracking-wider text-cyan-400">
-      Research in progress
-    </p>
+          <section className="mx-auto mt-8 max-w-xl rounded-xl border border-cyan-400/30 bg-slate-900 p-6 text-left">
+            <p className="text-sm font-semibold uppercase tracking-wider text-cyan-400">
+              Research in progress
+            </p>
 
-    <ol className="mt-5 space-y-3">
-      {researchStages.map((stage) => (
-        <li key={stage} className="flex items-center gap-3 text-slate-300">
-          <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-cyan-400" />
-          {stage}
-        </li>
-      ))}
-    </ol>
+            <ol className="mt-5 space-y-3">
+              {researchStages.map((stage) => (
+                <li key={stage} className="flex items-center gap-3 text-slate-300">
+                  <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-cyan-400" />
+                  {stage}
+                </li>
+              ))}
+            </ol>
 
-    <p className="mt-5 text-sm leading-6 text-slate-500">
-      These are the steps the system performs. Live per-step completion will be
-      added later with server-sent events.
-    </p>
-  </section>
-)}
+            <p className="mt-5 text-sm leading-6 text-slate-500">
+              These are the steps the system performs. Live per-step completion will be
+              added later with server-sent events.
+            </p>
+          </section>
+        )}
         {researchResult?.profile && (
           <section className="mx-auto mt-8 max-w-xl rounded-xl border border-cyan-400/30 bg-slate-900 p-6 text-left">
             <p className="text-sm font-semibold uppercase tracking-wider text-cyan-400">
@@ -189,46 +191,48 @@ export default function Home() {
                 </dd>
               </div>
             </dl>
-          </section>  
+          </section>
         )}
         {researchResult?.report && (
-  <section className="mx-auto mt-8 max-w-4xl rounded-xl border border-slate-800 bg-slate-900 p-6 text-left">
-    <p className="text-sm font-semibold uppercase tracking-wider text-cyan-400">
-      Research report
-    </p>
+          <section className="mx-auto mt-8 max-w-4xl rounded-xl border border-slate-800 bg-slate-900 p-6 text-left">
+            <p className="text-sm font-semibold uppercase tracking-wider text-cyan-400">
+              Research report
+            </p>
 
-    <div className="mt-5 whitespace-pre-wrap leading-7 text-slate-200">
-      {researchResult.report}
-    </div>
+            <article className="mt-5 leading-7 text-slate-200 [&_h1]:mt-6 [&_h1]:text-2xl [&_h1]:font-bold [&_h2]:mt-8 [&_h2]:text-xl [&_h2]:font-semibold [&_ul]:list-disc [&_ul]:space-y-2 [&_ul]:pl-6 [&_ol]:list-decimal [&_ol]:pl-6 [&_table]:w-full [&_table]:border-collapse [&_th]:border [&_th]:border-slate-700 [&_th]:bg-slate-800 [&_th]:p-2 [&_td]:border [&_td]:border-slate-700 [&_td]:p-2">
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                {researchResult.report}
+              </ReactMarkdown>
+            </article>
 
-    {researchResult.sources && researchResult.sources.length > 0 && (
-      <div className="mt-8 border-t border-slate-800 pt-6">
-        <h2 className="text-lg font-semibold text-white">Sources</h2>
+            {researchResult.sources && researchResult.sources.length > 0 && (
+              <div className="mt-8 border-t border-slate-800 pt-6">
+                <h2 className="text-lg font-semibold text-white">Sources</h2>
 
-        <ul className="mt-4 space-y-3">
-          {researchResult.sources.map((source) => (
-            <li key={source.url}>
-              <a
-                href={source.url}
-                target="_blank"
-                rel="noreferrer"
-                className="block rounded-lg border border-slate-800 p-4 hover:border-cyan-400"
-              >
-                <p className="font-medium text-cyan-400">{source.title}</p>
+                <ul className="mt-4 space-y-3">
+                  {researchResult.sources.map((source, index) => (
+                    <li key={`${source.url}-${index}`}>
+                      <a
+                        href={source.url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="block rounded-lg border border-slate-800 p-4 hover:border-cyan-400"
+                      >
+                        <p className="font-medium text-cyan-400">{source.title}</p>
 
-                {source.snippet && (
-                  <p className="mt-2 text-sm leading-6 text-slate-400">
-                    {source.snippet}
-                  </p>
-                )}
-              </a>
-            </li>
-          ))}
-        </ul>
-      </div>
-    )}
-  </section>
-)}
+                        {source.snippet && (
+                          <p className="mt-2 text-sm leading-6 text-slate-400">
+                            {source.snippet}
+                          </p>
+                        )}
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </section>
+        )}
       </section>
 
       <section className="mx-auto grid max-w-6xl gap-5 px-6 pb-20 md:grid-cols-3">
@@ -246,16 +250,16 @@ export default function Home() {
         ))}
       </section>
       <section className="mx-auto max-w-6xl px-6 pb-16">
-  <aside className="rounded-xl border border-amber-400/30 bg-amber-400/10 p-5 text-sm leading-6 text-amber-100">
-    <p className="font-semibold">Important research disclaimer</p>
+        <aside className="rounded-xl border border-amber-400/30 bg-amber-400/10 p-5 text-sm leading-6 text-amber-100">
+          <p className="font-semibold">Important research disclaimer</p>
 
-    <p className="mt-2 text-amber-100/80">
-      This application provides educational, AI-assisted research only. It is
-      not financial, investment, tax, or legal advice. Verify every important
-      claim using the linked sources before making financial decisions.
-    </p>
-  </aside>
-</section>
+          <p className="mt-2 text-amber-100/80">
+            This application provides educational, AI-assisted research only. It is
+            not financial, investment, tax, or legal advice. Verify every important
+            claim using the linked sources before making financial decisions.
+          </p>
+        </aside>
+      </section>
 
     </main>
   );

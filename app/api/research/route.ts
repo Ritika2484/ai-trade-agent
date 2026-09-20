@@ -2,7 +2,11 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { researchGraph } from "../../../library/agent/graph";
 import { getAdminAuth } from "../../../library/firebase/admin";
-
+import {
+  getUserRole,
+  hasPermission,
+  type UserRole,
+} from "../../../library/auth/roles";
 export const runtime = "nodejs";
 
 const researchRequestSchema = z.object({
@@ -21,14 +25,25 @@ export async function POST(request: Request) {
 
   const idToken = authHeader.slice(7);
 
-  try {
-    await getAdminAuth().verifyIdToken(idToken);
-  } catch {
+let role: UserRole;
+
+try {
+  const decodedToken = await getAdminAuth().verifyIdToken(idToken);
+
+  role = getUserRole(decodedToken);
+
+  if (!hasPermission(role, "research:basic")) {
     return NextResponse.json(
-      { error: "Unauthorized. Your sign-in session is invalid or expired." },
-      { status: 401 },
+      { error: "Your account does not have permission to run research." },
+      { status: 403 },
     );
   }
+} catch {
+  return NextResponse.json(
+    { error: "Unauthorized. Your sign-in session is invalid or expired." },
+    { status: 401 },
+  );
+}
 
   let body: unknown;
 
@@ -68,6 +83,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({
       status: "complete",
+      role,
       generatedAt: new Date().toISOString(),
       company: result.profile.canonicalName,
       profile: result.profile,

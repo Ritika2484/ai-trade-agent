@@ -2,12 +2,6 @@
 
 import { type FormEvent, useState } from "react";
 import { useAuth } from "../components/AuthContext";
-type CompanyProfile = {
-  canonicalName: string;
-  ticker: string | null;
-  website: string | null;
-};
-
 
 type ResearchSource = {
   title: string;

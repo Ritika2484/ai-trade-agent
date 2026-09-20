@@ -1,8 +1,9 @@
-import type { Auth } from "firebase-admin/auth";
+import { cert, getApp, getApps, initializeApp } from "firebase-admin/app";
+import { getAuth, type Auth } from "firebase-admin/auth";
 
 let adminAuth: Auth | null = null;
 
-export function getAdminAuth(): any {
+export function getAdminAuth(): Auth {
   if (adminAuth) {
     return adminAuth;
   }
@@ -14,9 +15,6 @@ export function getAdminAuth(): any {
   if (!projectId || !clientEmail || !privateKey) {
     throw new Error("Firebase Admin credentials are missing.");
   }
-
-  const { cert, getApp, getApps, initializeApp } = require("firebase-admin/app");
-  const { getAuth } = require("firebase-admin/auth");
 
   const formattedPrivateKey = privateKey
     .replace(/^["']|["']$/g, "")

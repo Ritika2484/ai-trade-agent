@@ -98,6 +98,8 @@ const ResearchResultSchema = new Schema<IResearchResult>(
 );
 
 ResearchResultSchema.index({ userId: 1, createdAt: -1 });
+ResearchResultSchema.index({ companyQuery: 1, createdAt: -1 });
+ResearchResultSchema.index({ userId: 1, companyQuery: 1 });
 
 const ResearchResult: Model<IResearchResult> =
   mongoose.models.ResearchResult ||

@@ -8,22 +8,29 @@ export type Permission =
   | "research:basic"
   | "research:deep"
   | "history:read"
-  | "users:manage";
+  | "watchlist:write"
+  | "admin:access"
+  | "admin:users"
+  | "quota:manage";
 
 const permissionsByRole: Record<UserRole, Permission[]> = {
-  user: ["research:basic", "history:read"],
+  user: ["research:basic", "history:read", "watchlist:write"],
 
   analyst: [
     "research:basic",
     "research:deep",
     "history:read",
+    "watchlist:write",
   ],
 
   admin: [
     "research:basic",
     "research:deep",
     "history:read",
-    "users:manage",
+    "watchlist:write",
+    "admin:access",
+    "admin:users",
+    "quota:manage",
   ],
 };
 
@@ -41,3 +48,12 @@ export function hasPermission(
 ): boolean {
   return permissionsByRole[role].includes(permission);
 }
+
+/**
+ * Human-readable role labels for display in the UI.
+ */
+export const ROLE_LABELS: Record<UserRole, string> = {
+  user: "Researcher",
+  analyst: "Analyst",
+  admin: "Administrator",
+};

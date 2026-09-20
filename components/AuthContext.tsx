@@ -14,6 +14,7 @@ import {
   useEffect,
   useState,
 } from "react";
+import { setCookie, deleteCookie } from "cookies-next";
 import { auth } from "../library/firebase/client";
 
 type AuthContextValue = {
@@ -31,8 +32,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       setUser(currentUser);
+      if (currentUser) {
+        const token = await currentUser.getIdToken();
+        setCookie("token", token, { maxAge: 60 * 60 * 24 * 7, path: "/" }); // 7 days
+      } else {
+        deleteCookie("token");
+      }
       setLoading(false);
     });
 

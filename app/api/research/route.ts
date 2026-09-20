@@ -1,116 +1,144 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { researchGraph } from "../../../library/agent/graph";
-import { getAdminAuth } from "../../../library/firebase/admin";
-import {
-  getUserRole,
-  hasPermission,
-  type UserRole,
-} from "../../../library/auth/roles";
+import { logAudit, getRequestIp, getRequestUserAgent } from "../../../library/audit/service";
+import { authenticateRequest, requirePermission } from "../../../library/auth/middleware";
+import { dbConnect } from "../../../library/db/mongoose";
+import ResearchResult from "../../../library/db/models/ResearchResult";
+import { handleApiError } from "../../../library/errors/handler";
+import { checkQuotas, recordAIUsage } from "../../../library/quota/service";
+
 export const runtime = "nodejs";
 
 const researchRequestSchema = z.object({
-  company: z.string().trim().min(1, "Company name is required.").max(100),
+  company: z
+    .string()
+    .trim()
+    .min(1, "Company name is required.")
+    .max(100, "Company name must be 100 characters or fewer."),
 });
 
 export async function POST(request: Request) {
-  const authHeader = request.headers.get("Authorization");
-
-  if (!authHeader?.startsWith("Bearer ")) {
-    return NextResponse.json(
-      { error: "Unauthorized. Please sign in before starting research." },
-      { status: 401 },
-    );
-  }
-
-  const idToken = authHeader.slice(7);
-
-let role: UserRole;
-
-try {
-  const decodedToken = await getAdminAuth().verifyIdToken(idToken);
-
-  role = getUserRole(decodedToken);
-
-  if (!hasPermission(role, "research:basic")) {
-    return NextResponse.json(
-      { error: "Your account does not have permission to run research." },
-      { status: 403 },
-    );
-  }
-} catch {
-  return NextResponse.json(
-    { error: "Unauthorized. Your sign-in session is invalid or expired." },
-    { status: 401 },
-  );
-}
-
-  let body: unknown;
-
   try {
-    body = await request.json();
-  } catch {
-    return NextResponse.json(
-      { error: "The request body must be valid JSON." },
-      { status: 400 },
-    );
-  }
+    // 1. Authenticate
+    const auth = await authenticateRequest(request);
+    if (auth instanceof NextResponse) return auth;
+    const { uid, role } = auth;
 
-  const parsedRequest = researchRequestSchema.safeParse(body);
+    // 2. Check permission
+    const permError = requirePermission(role, "research:basic");
+    if (permError) return permError;
 
-  if (!parsedRequest.success) {
-    return NextResponse.json(
-      { error: "Please provide a company name of up to 100 characters." },
-      { status: 400 },
-    );
-  }
+    // 3. Validate body
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json(
+        {
+          success: false,
+          error: { code: "BAD_REQUEST", message: "The request body must be valid JSON." },
+        },
+        { status: 400 },
+      );
+    }
 
-  const company = parsedRequest.data.company;
+    const parsed = researchRequestSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: { code: "VALIDATION_ERROR", message: "Please provide a company name of up to 100 characters." },
+        },
+        { status: 400 },
+      );
+    }
 
-  try {
-    const result = await researchGraph.invoke({
-      companyName: company,
-    });
+    const company = parsed.data.company;
 
-    if (
-      !result.profile ||
-      !result.findings ||
-      !result.verdict ||
-      !result.sources
-    ) {
+    // 4. Check quota (daily + monthly)
+    const quota = await checkQuotas(uid, role);
+    if (!quota.allowed) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: { code: "RATE_LIMITED", message: quota.reason },
+          remaining: 0,
+        },
+        { status: 429 },
+      );
+    }
+
+    // 5. Run AI research pipeline
+    const result = await researchGraph.invoke({ companyName: company });
+
+    if (!result.profile || !result.findings || !result.verdict || !result.sources) {
       throw new Error("The research workflow returned an incomplete result.");
     }
 
+    // 6. Persist to MongoDB
+    await dbConnect();
+    const saved = await ResearchResult.create({
+      userId: uid,
+      companyQuery: company.toLowerCase().trim(),
+      profile: result.profile,
+      findings: result.findings,
+      verdict: {
+        ...result.verdict,
+        verdict: result.verdict.verdict.toUpperCase().trim() as "INVEST" | "PASS",
+      },
+      sources: result.sources,
+    });
+
+    // 7. Record AI usage (only after successful research)
+    await recordAIUsage(uid);
+
+    // 8. Audit log (fire-and-forget)
+    logAudit({
+      actorUserId: uid,
+      actorRole: role,
+      action: "research.create",
+      resourceType: "ResearchResult",
+      resourceId: saved._id.toString(),
+      metadata: {
+        company: result.profile.canonicalName,
+        ticker: result.profile.ticker,
+        verdict: result.verdict.verdict,
+      },
+      ip: getRequestIp(request),
+      userAgent: getRequestUserAgent(request),
+    });
+
     return NextResponse.json({
+      success: true,
       status: "complete",
       role,
-      generatedAt: new Date().toISOString(),
+      reportId: saved._id.toString(),
+      generatedAt: saved.createdAt.toISOString(),
       company: result.profile.canonicalName,
       profile: result.profile,
       findings: result.findings,
       verdict: result.verdict,
       sources: result.sources,
       summary: `${result.profile.canonicalName} research completed.`,
+      quota: { remaining: quota.remaining - 1 },
     });
   } catch (error) {
-    console.error("Company research failed:", error);
-
-    const errorMessage =
-      error instanceof Error ? error.message : "Unknown research error.";
-
-    if (errorMessage.includes("rate_limit_exceeded")) {
+    // Groq rate limit passthrough
+    const msg = error instanceof Error ? error.message : "";
+    if (msg.includes("rate_limit_exceeded")) {
       return NextResponse.json(
         {
-          error:
-            "The AI research quota is temporarily exhausted. Please try again shortly.",
+          success: false,
+          error: {
+            code: "RATE_LIMITED",
+            message: "The AI research quota is temporarily exhausted. Please try again shortly.",
+          },
         },
         { status: 429 },
       );
     }
 
-    return NextResponse.json(
-      { error: "AI research could not run. Check the server terminal." },
-      { status: 500 },
-    );
+    return handleApiError(error);
   }
 }
